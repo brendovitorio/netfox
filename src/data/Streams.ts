@@ -13,7 +13,7 @@ export type GetStreamOptions = {
   episode?: string | number;
 };
 
-const SUPERFLIX_BASE_URL = 'https://superflixapi.cyou';
+const SUPERFLIX_BASE_URL = 'https://superflixapi.lifestyle';
 
 export const Streams: Record<string, StreamSource> = {};
 
@@ -40,13 +40,13 @@ export function buildSuperflixUrl(
   if (!type) return null;
 
   if (mediaType === 'movie') {
-    return `${SUPERFLIX_BASE_URL}/${type}/${tmdbId}#noLink`;
+    return `${SUPERFLIX_BASE_URL}/${type}/${tmdbId}`;
   }
 
   const season = options.season ?? 1;
   const episode = options.episode ?? 1;
 
-  return `${SUPERFLIX_BASE_URL}/${type}/${tmdbId}/${season}/${episode}#noLink`;
+  return `${SUPERFLIX_BASE_URL}/${type}/${tmdbId}/${season}/${episode}`;
 }
 
 export function getStream(

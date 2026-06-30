@@ -6,11 +6,12 @@ interface MovieCardProps {
   title: string;
   posterPath?: string | null;
   mediaType?: MediaType;
-  rating?: number;
+  rating?: number | null;
 }
 
 function labelOf(mediaType: MediaType) {
   if (mediaType === 'anime') return 'Anime';
+  if (mediaType === 'dorama') return 'Dorama';
   if (mediaType === 'tv') return 'Série';
   return 'Filme';
 }

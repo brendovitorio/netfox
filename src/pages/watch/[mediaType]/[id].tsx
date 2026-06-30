@@ -1,6 +1,7 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import MovieCard from '../../../components/MovieCard';
+import ScrollRow from '../../../components/ScrollRow';
 import { fetchAniListDetails, fetchAniListSimilar } from '../../../services/anilist';
 import {
   fetchDetails,
@@ -29,6 +30,7 @@ type WatchPageProps = {
 
 function mediaLabel(mediaType: MediaType) {
   if (mediaType === 'anime') return 'Anime';
+  if (mediaType === 'dorama') return 'Dorama';
   if (mediaType === 'tv') return 'Série';
   return 'Filme';
 }
@@ -132,7 +134,7 @@ export default function WatchPage({
             {seasons.length > 1 ? (
               <div>
                 <h2 className="mb-3 text-sm font-black uppercase tracking-wider text-zinc-400">Temporadas</h2>
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <ScrollRow>
                   {seasons.map((season) => (
                     <Link
                       key={season.season_number}
@@ -144,7 +146,7 @@ export default function WatchPage({
                       T{season.season_number}
                     </Link>
                   ))}
-                </div>
+                </ScrollRow>
               </div>
             ) : null}
 
@@ -172,7 +174,7 @@ export default function WatchPage({
                   </Link>
                 </div>
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <ScrollRow>
                 {episodeList.map((episode) => (
                   <Link
                     key={episode}
@@ -184,7 +186,7 @@ export default function WatchPage({
                     EP {episode}
                   </Link>
                 ))}
-              </div>
+              </ScrollRow>
             </div>
           </div>
         ) : null}
@@ -196,10 +198,9 @@ export default function WatchPage({
               src={stream.src}
               title={`${title} - ${stream.provider}`}
               className="h-full w-full border-0 bg-black"
-              allow="fullscreen; autoplay; encrypted-media; picture-in-picture"
+              allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *; accelerometer *; gyroscope *; web-share *"
               allowFullScreen
-              sandbox="allow-scripts allow-same-origin allow-forms"
-              referrerPolicy="no-referrer"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
             />
           ) : (
             <div className="grid h-full min-h-[320px] place-items-center bg-[radial-gradient(circle_at_center,rgba(220,38,38,.22),transparent_45%),#080808] p-6 text-center">
@@ -224,7 +225,7 @@ export default function WatchPage({
       {similar.length ? (
         <section className="px-5 pb-16 sm:px-10 lg:px-16">
           <h2 className="mb-4 text-3xl font-black">Parecidos</h2>
-          <div className="scrollbar-hide flex gap-4 overflow-x-auto pb-4">
+          <ScrollRow gapClassName="gap-4">
             {similar.map((item) => (
               <MovieCard
                 key={`${item.media_type}-${item.id}`}
@@ -235,7 +236,7 @@ export default function WatchPage({
                 rating={item.vote_average}
               />
             ))}
-          </div>
+          </ScrollRow>
         </section>
       ) : null}
     </main>
@@ -249,10 +250,12 @@ export const getServerSideProps: GetServerSideProps<WatchPageProps> = async (con
   const seasonParam = Array.isArray(context.query.season) ? context.query.season[0] : context.query.season;
   const episodeParam = Array.isArray(context.query.episode) ? context.query.episode[0] : context.query.episode;
 
-  if ((mediaTypeParam !== 'movie' && mediaTypeParam !== 'tv' && mediaTypeParam !== 'anime') || !idParam) {
+  const validMediaTypes = ['movie', 'tv', 'anime', 'dorama'];
+  if (!validMediaTypes.includes(mediaTypeParam || '') || !idParam) {
     return { notFound: true };
   }
 
+  const seasonExplicit = seasonParam !== undefined;
   const requestedSeason = Math.max(Number(seasonParam || 1), 1);
   const requestedEpisode = Math.max(Number(episodeParam || 1), 1);
 
@@ -276,7 +279,10 @@ export const getServerSideProps: GetServerSideProps<WatchPageProps> = async (con
 
       if (match && match.mediaType === 'tv') {
         seasons = await fetchTmdbSeasons(match.id).catch(() => []);
-        if (!seasons.find((season) => season.season_number === selectedSeason)) {
+
+        if (!seasonExplicit && match.seasonHint && seasons.find((season) => season.season_number === match.seasonHint)) {
+          selectedSeason = match.seasonHint;
+        } else if (!seasons.find((season) => season.season_number === selectedSeason)) {
           selectedSeason = seasons[0]?.season_number || 1;
         }
         const currentSeason = seasons.find((season) => season.season_number === selectedSeason);
@@ -303,7 +309,7 @@ export const getServerSideProps: GetServerSideProps<WatchPageProps> = async (con
       };
     }
 
-    const tmdbMediaType = mediaTypeParam as TmdbMediaType;
+    const tmdbMediaType: TmdbMediaType = mediaTypeParam === 'dorama' ? 'tv' : (mediaTypeParam as TmdbMediaType);
 
     const [details, similar] = await Promise.all([
       fetchDetails(tmdbMediaType, idParam),
@@ -339,7 +345,7 @@ export const getServerSideProps: GetServerSideProps<WatchPageProps> = async (con
 
     return {
       props: {
-        mediaType: mediaTypeParam,
+        mediaType: mediaTypeParam as MediaType,
         details,
         similar,
         stream,

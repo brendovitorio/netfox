@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const SUPERFLIX_BASE_URL = 'https://superflixapi.cyou/lista';
+const SUPERFLIX_BASE_URL = 'https://superflixapi.lifestyle/lista';
 const ALLOWED_CATEGORIES = new Set(['filme', 'serie', 'anime', 'dorama']);
 const ALLOWED_TYPES = new Set(['generos', 'imdb', 'tmdb']);
 

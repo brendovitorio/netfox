@@ -43,7 +43,7 @@ function mapAnime(item: any): MediaItem {
     poster_path: item.coverImage?.extraLarge || item.coverImage?.large || null,
     backdrop_path: item.bannerImage || item.coverImage?.extraLarge || null,
     first_air_date: dateFromAniList(item.startDate),
-    vote_average: typeof item.averageScore === 'number' ? item.averageScore / 10 : undefined,
+    vote_average: typeof item.averageScore === 'number' ? item.averageScore / 10 : null,
   };
 }
 
@@ -179,7 +179,7 @@ export async function fetchAniListDetails(id: string | number) {
     poster_path: media.coverImage?.extraLarge || media.coverImage?.large || null,
     backdrop_path: media.bannerImage || media.coverImage?.extraLarge || null,
     first_air_date: dateFromAniList(media.startDate),
-    vote_average: typeof media.averageScore === 'number' ? media.averageScore / 10 : undefined,
+    vote_average: typeof media.averageScore === 'number' ? media.averageScore / 10 : null,
     runtime: media.duration,
     number_of_episodes: media.episodes,
     status: media.status,
