@@ -81,7 +81,7 @@ export default function WatchPage({
           : null;
 
   const backdrop = imageUrl(details.backdrop_path || details.poster_path, 'original');
-  const poster = imageUrl(details.poster_path, 'w500');
+  const poster = imageUrl(details.poster_path, 'w342');
 
   const genres = Array.isArray(details.genres)
     ? details.genres.map((genre: any) => (typeof genre === 'string' ? genre : genre.name)).filter(Boolean).join(' • ')

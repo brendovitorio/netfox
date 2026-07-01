@@ -6,17 +6,20 @@ import { MediaItem, titleOf } from '../services/tmdb';
 
 type MediaRowProps = {
   title: string;
-  fetcher: () => Promise<MediaItem[]>;
+  fetcher?: () => Promise<MediaItem[]>;
+  items?: MediaItem[];
   empty?: string;
   limit?: number;
   viewAllHref?: string;
 };
 
-export default function MediaRow({ title, fetcher, empty = 'Nada encontrado.', limit = 18, viewAllHref }: MediaRowProps) {
-  const [items, setItems] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function MediaRow({ title, fetcher, items: initialItems, empty = 'Nada encontrado.', limit = 18, viewAllHref }: MediaRowProps) {
+  const [items, setItems] = useState<MediaItem[]>(() => (initialItems ? initialItems.slice(0, limit) : []));
+  const [loading, setLoading] = useState(!initialItems);
 
   useEffect(() => {
+    if (initialItems || !fetcher) return;
+
     let active = true;
     setLoading(true);
 

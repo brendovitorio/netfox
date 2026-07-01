@@ -47,7 +47,14 @@ function mapAnime(item: any): MediaItem {
   };
 }
 
+const _aniCache = new Map<string, { data: unknown; exp: number }>();
+
 async function aniListFetch<T>(query: string, variables: Record<string, any> = {}): Promise<T> {
+  const key = JSON.stringify({ query, variables });
+  const now = Date.now();
+  const hit = _aniCache.get(key);
+  if (hit && hit.exp > now) return hit.data as T;
+
   const response = await fetch(ANILIST_URL, {
     method: 'POST',
     headers: {
@@ -62,6 +69,7 @@ async function aniListFetch<T>(query: string, variables: Record<string, any> = {
   const payload = await response.json();
   if (payload.errors?.length) throw new Error(payload.errors[0]?.message || 'Erro na AniList.');
 
+  _aniCache.set(key, { data: payload.data, exp: now + 5 * 60 * 1000 });
   return payload.data as T;
 }
 

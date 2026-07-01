@@ -46,10 +46,19 @@ function buildUrl(path: string, params: Record<string, string | number | undefin
   return url.toString();
 }
 
+const _tmdbCache = new Map<string, { data: unknown; exp: number }>();
+
 async function tmdbFetch<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
-  const res = await fetch(buildUrl(path, params));
+  const url = buildUrl(path, params);
+  const now = Date.now();
+  const hit = _tmdbCache.get(url);
+  if (hit && hit.exp > now) return hit.data as T;
+
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`TMDB respondeu ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  _tmdbCache.set(url, { data, exp: now + 5 * 60 * 1000 });
+  return data as T;
 }
 
 export async function fetchMovies(endpoint: string): Promise<MediaItem[]> {

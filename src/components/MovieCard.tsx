@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { imageUrl, MediaType } from '../services/tmdb';
 
@@ -21,11 +22,12 @@ export default function MovieCard({ id, title, posterPath, mediaType = 'movie', 
     <Link href={`/watch/${mediaType}/${id}`} className="group block min-w-[152px] max-w-[152px] sm:min-w-[180px] sm:max-w-[180px]">
       <article className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-xl shadow-black/30 transition duration-300 group-hover:-translate-y-1 group-hover:border-red-500/60 group-hover:shadow-red-950/30">
         <div className="relative aspect-[2/3] overflow-hidden bg-zinc-900">
-          <img
-            src={imageUrl(posterPath, 'w500')}
+          <Image
+            src={imageUrl(posterPath, 'w342')}
             alt={title}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-            loading="lazy"
+            fill
+            sizes="(max-width: 640px) 152px, 180px"
+            className="object-cover transition duration-500 group-hover:scale-110"
           />
           <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/95 to-transparent" />
           <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">

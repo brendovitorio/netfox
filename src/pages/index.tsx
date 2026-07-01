@@ -1,3 +1,4 @@
+import { GetStaticProps } from 'next';
 import { useEffect, useState } from 'react';
 import CategoryNav from '../components/CategoryNav';
 import MediaRow from '../components/MediaRow';
@@ -5,22 +6,18 @@ import MovieCard from '../components/MovieCard';
 import { fetchAniListSection, searchAniList } from '../services/anilist';
 import { fetchDoramas, fetchMovies, imageUrl, MediaItem, searchMulti, titleOf } from '../services/tmdb';
 
-export default function Home() {
-  const [hero, setHero] = useState<MediaItem | null>(null);
+type HomeProps = {
+  hero: MediaItem | null;
+  movies: MediaItem[];
+  series: MediaItem[];
+  anime: MediaItem[];
+  doramas: MediaItem[];
+};
+
+export default function Home({ hero, movies, series, anime, doramas }: HomeProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<MediaItem[]>([]);
   const [searching, setSearching] = useState(false);
-
-  useEffect(() => {
-    Promise.allSettled([fetchMovies('/trending/all/week'), fetchAniListSection('trending', 6)])
-      .then(([tmdbResult, animeResult]) => {
-        const tmdbItems = tmdbResult.status === 'fulfilled' ? tmdbResult.value : [];
-        const animeItems = animeResult.status === 'fulfilled' ? animeResult.value : [];
-        const valid = [...animeItems, ...tmdbItems].filter((item) => item.poster_path || item.backdrop_path);
-        setHero(valid[0] || null);
-      })
-      .catch(() => setHero(null));
-  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(async () => {
@@ -31,10 +28,10 @@ export default function Home() {
 
       setSearching(true);
       try {
-        const [tmdb, anime] = await Promise.allSettled([searchMulti(query), searchAniList(query, 12)]);
+        const [tmdb, aniList] = await Promise.allSettled([searchMulti(query), searchAniList(query, 12)]);
 
         const merged = [
-          ...(anime.status === 'fulfilled' ? anime.value : []),
+          ...(aniList.status === 'fulfilled' ? aniList.value : []),
           ...(tmdb.status === 'fulfilled' ? tmdb.value : []),
         ];
 
@@ -99,15 +96,10 @@ export default function Home() {
       </section>
 
       <section id="catalogo" className="space-y-12 px-5 py-12 sm:px-10 lg:px-16">
-        <MediaRow title="Filmes populares" fetcher={() => fetchMovies('/movie/popular')} viewAllHref="/filmes" />
-        <MediaRow title="Séries populares" fetcher={() => fetchMovies('/tv/popular')} viewAllHref="/series" />
-        <MediaRow
-          title="Animes em alta"
-          fetcher={() => fetchAniListSection('trending', 18)}
-          empty="Nada retornado pela AniList."
-          viewAllHref="/animes"
-        />
-        <MediaRow title="Doramas populares" fetcher={() => fetchDoramas('popularity.desc')} viewAllHref="/doramas" />
+        <MediaRow title="Filmes populares" items={movies} viewAllHref="/filmes" />
+        <MediaRow title="Séries populares" items={series} viewAllHref="/series" />
+        <MediaRow title="Animes em alta" items={anime} empty="Nada retornado pela AniList." viewAllHref="/animes" />
+        <MediaRow title="Doramas populares" items={doramas} viewAllHref="/doramas" />
 
         <section>
           <div className="flex flex-col items-start justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:flex-row sm:items-center">
@@ -143,3 +135,25 @@ function Grid({ items, empty }: { items: MediaItem[]; empty: string }) {
     </div>
   );
 }
+
+export const getStaticProps: GetStaticProps<HomeProps> = async () => {
+  const [moviesResult, seriesResult, animeResult, doramasResult, heroResult] = await Promise.allSettled([
+    fetchMovies('/movie/popular'),
+    fetchMovies('/tv/popular'),
+    fetchAniListSection('trending', 18),
+    fetchDoramas('popularity.desc'),
+    fetchMovies('/trending/all/week'),
+  ]);
+
+  const movies = moviesResult.status === 'fulfilled' ? moviesResult.value : [];
+  const series = seriesResult.status === 'fulfilled' ? seriesResult.value : [];
+  const anime = animeResult.status === 'fulfilled' ? animeResult.value : [];
+  const doramas = doramasResult.status === 'fulfilled' ? doramasResult.value : [];
+  const heroPool = heroResult.status === 'fulfilled' ? heroResult.value : [];
+  const hero = [...anime, ...heroPool].find((item) => item.backdrop_path) || heroPool[0] || null;
+
+  return {
+    props: { hero, movies, series, anime, doramas },
+    revalidate: 300,
+  };
+};
