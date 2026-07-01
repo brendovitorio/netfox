@@ -1,5 +1,6 @@
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
+import { useState } from 'react';
 import MovieCard from '../../../components/MovieCard';
 import ScrollRow from '../../../components/ScrollRow';
 import { fetchAniListDetails, fetchAniListSimilar } from '../../../services/anilist';
@@ -15,13 +16,13 @@ import {
   TmdbMediaType,
   TmdbSeasonSummary,
 } from '../../../services/tmdb';
-import { getStream, StreamSource } from '../../../data/Streams';
+import { getStreams, StreamSource } from '../../../data/Streams';
 
 type WatchPageProps = {
   mediaType: MediaType;
   details: any;
   similar: MediaItem[];
-  stream: StreamSource | null;
+  streams: StreamSource[];
   seasons: TmdbSeasonSummary[];
   selectedSeason: number;
   selectedEpisode: number;
@@ -42,31 +43,34 @@ function findAdjacentEpisode(
   direction: 'next' | 'prev'
 ): { season: number; episode: number } | null {
   const sorted = [...seasons].sort((a, b) => a.season_number - b.season_number);
-  const index = sorted.findIndex((season) => season.season_number === currentSeason);
+  const index = sorted.findIndex((s) => s.season_number === currentSeason);
   if (index === -1) return null;
 
   if (direction === 'next') {
     const episodeCount = sorted[index].episode_count || 1;
     if (currentEpisode < episodeCount) return { season: currentSeason, episode: currentEpisode + 1 };
-    const nextSeason = sorted[index + 1];
-    return nextSeason ? { season: nextSeason.season_number, episode: 1 } : null;
+    const next = sorted[index + 1];
+    return next ? { season: next.season_number, episode: 1 } : null;
   }
 
   if (currentEpisode > 1) return { season: currentSeason, episode: currentEpisode - 1 };
-  const prevSeason = sorted[index - 1];
-  return prevSeason ? { season: prevSeason.season_number, episode: prevSeason.episode_count || 1 } : null;
+  const prev = sorted[index - 1];
+  return prev ? { season: prev.season_number, episode: prev.episode_count || 1 } : null;
 }
 
 export default function WatchPage({
   mediaType,
   details,
   similar,
-  stream,
+  streams,
   seasons,
   selectedSeason,
   selectedEpisode,
   approximateMatch,
 }: WatchPageProps) {
+  const [providerIndex, setProviderIndex] = useState(0);
+
+  const stream = streams[providerIndex] ?? null;
   const title = details.title || details.name || 'Sem título';
   const year = (details.release_date || details.first_air_date || '').slice(0, 4);
   const hasEpisodeNavigation = seasons.length > 0;
@@ -84,12 +88,12 @@ export default function WatchPage({
   const poster = imageUrl(details.poster_path, 'w342');
 
   const genres = Array.isArray(details.genres)
-    ? details.genres.map((genre: any) => (typeof genre === 'string' ? genre : genre.name)).filter(Boolean).join(' • ')
+    ? details.genres.map((g: any) => (typeof g === 'string' ? g : g.name)).filter(Boolean).join(' • ')
     : '';
 
-  const currentSeason = seasons.find((season) => season.season_number === selectedSeason);
+  const currentSeason = seasons.find((s) => s.season_number === selectedSeason);
   const episodeCount = currentSeason?.episode_count || 1;
-  const episodeList = Array.from({ length: episodeCount }, (_, index) => index + 1);
+  const episodeList = Array.from({ length: episodeCount }, (_, i) => i + 1);
 
   const prevEpisode = hasEpisodeNavigation ? findAdjacentEpisode(seasons, selectedSeason, selectedEpisode, 'prev') : null;
   const nextEpisode = hasEpisodeNavigation ? findAdjacentEpisode(seasons, selectedSeason, selectedEpisode, 'next') : null;
@@ -200,7 +204,6 @@ export default function WatchPage({
               className="h-full w-full border-0 bg-black"
               allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *; clipboard-write *; accelerometer *; gyroscope *; web-share *"
               allowFullScreen
-              sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
             />
           ) : (
             <div className="grid h-full min-h-[320px] place-items-center bg-[radial-gradient(circle_at_center,rgba(220,38,38,.22),transparent_45%),#080808] p-6 text-center">
@@ -209,7 +212,7 @@ export default function WatchPage({
                 <h2 className="text-2xl font-black">Player não encontrado</h2>
                 <p className="text-zinc-300">
                   {mediaType === 'anime'
-                    ? 'Não encontramos esse anime no catálogo do player. Tente outro título ou ajuste a temporada manualmente.'
+                    ? 'Não encontramos esse anime no catálogo. Tente outro título ou ajuste a temporada manualmente.'
                     : 'Não foi possível gerar a fonte para este conteúdo.'}
                 </p>
               </div>
@@ -217,8 +220,25 @@ export default function WatchPage({
           )}
         </div>
 
-        {stream ? (
-          <p className="mt-3 text-xs text-zinc-500">Fonte: {stream.provider} • {stream.quality || 'auto'}</p>
+        {streams.length > 0 ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-500">Servidor</span>
+            {streams.map((s, i) => (
+              <button
+                key={s.provider}
+                type="button"
+                onClick={() => setProviderIndex(i)}
+                className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
+                  i === providerIndex
+                    ? 'bg-red-600 text-white'
+                    : 'bg-white/10 text-zinc-300 hover:bg-white/20'
+                }`}
+              >
+                {s.provider}
+              </button>
+            ))}
+            <span className="ml-auto text-xs text-zinc-600">{stream?.quality || 'auto'}</span>
+          </div>
         ) : null}
       </section>
 
@@ -273,26 +293,25 @@ export const getServerSideProps: GetServerSideProps<WatchPageProps> = async (con
       const match = await resolveAnimeTmdbMatch(titleCandidates, details.seasonYear, tmdbMediaType).catch(() => null);
 
       let seasons: TmdbSeasonSummary[] = [];
-      let stream: StreamSource | null = null;
+      let streams: StreamSource[] = [];
       let selectedSeason = requestedSeason;
       let selectedEpisode = requestedEpisode;
 
       if (match && match.mediaType === 'tv') {
         seasons = await fetchTmdbSeasons(match.id).catch(() => []);
 
-        if (!seasonExplicit && match.seasonHint && seasons.find((season) => season.season_number === match.seasonHint)) {
+        if (!seasonExplicit && match.seasonHint && seasons.find((s) => s.season_number === match.seasonHint)) {
           selectedSeason = match.seasonHint;
-        } else if (!seasons.find((season) => season.season_number === selectedSeason)) {
+        } else if (!seasons.find((s) => s.season_number === selectedSeason)) {
           selectedSeason = seasons[0]?.season_number || 1;
         }
-        const currentSeason = seasons.find((season) => season.season_number === selectedSeason);
-        const maxEpisode = currentSeason?.episode_count || 1;
-        selectedEpisode = Math.min(selectedEpisode, maxEpisode);
-        stream = getStream('tv', match.id, { season: selectedSeason, episode: selectedEpisode });
+        const currentSeason = seasons.find((s) => s.season_number === selectedSeason);
+        selectedEpisode = Math.min(selectedEpisode, currentSeason?.episode_count || 1);
+        streams = getStreams('tv', match.id, { season: selectedSeason, episode: selectedEpisode });
       } else if (match && match.mediaType === 'movie') {
         selectedSeason = 1;
         selectedEpisode = 1;
-        stream = getStream('movie', match.id);
+        streams = getStreams('movie', match.id);
       }
 
       return {
@@ -300,7 +319,7 @@ export const getServerSideProps: GetServerSideProps<WatchPageProps> = async (con
           mediaType: 'anime',
           details,
           similar,
-          stream,
+          streams,
           seasons,
           selectedSeason,
           selectedEpisode,
@@ -319,11 +338,11 @@ export const getServerSideProps: GetServerSideProps<WatchPageProps> = async (con
     const seasons: TmdbSeasonSummary[] =
       tmdbMediaType === 'tv'
         ? (details.seasons || [])
-            .filter((season: any) => season.season_number > 0)
-            .map((season: any) => ({
-              season_number: season.season_number,
-              episode_count: season.episode_count,
-              name: season.name,
+            .filter((s: any) => s.season_number > 0)
+            .map((s: any) => ({
+              season_number: s.season_number,
+              episode_count: s.episode_count,
+              name: s.name,
             }))
         : [];
 
@@ -331,24 +350,21 @@ export const getServerSideProps: GetServerSideProps<WatchPageProps> = async (con
     let selectedEpisode = requestedEpisode;
 
     if (seasons.length) {
-      if (!seasons.find((season) => season.season_number === selectedSeason)) {
+      if (!seasons.find((s) => s.season_number === selectedSeason)) {
         selectedSeason = seasons[0].season_number;
       }
-      const currentSeason = seasons.find((season) => season.season_number === selectedSeason);
+      const currentSeason = seasons.find((s) => s.season_number === selectedSeason);
       selectedEpisode = Math.min(selectedEpisode, currentSeason?.episode_count || 1);
     }
 
-    const stream = getStream(tmdbMediaType, idParam, {
-      season: selectedSeason,
-      episode: selectedEpisode,
-    });
+    const streams = getStreams(tmdbMediaType, idParam, { season: selectedSeason, episode: selectedEpisode });
 
     return {
       props: {
         mediaType: mediaTypeParam as MediaType,
         details,
         similar,
-        stream,
+        streams,
         seasons,
         selectedSeason,
         selectedEpisode,

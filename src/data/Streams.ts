@@ -13,15 +13,36 @@ export type GetStreamOptions = {
   episode?: string | number;
 };
 
-const SUPERFLIX_BASE_URL = 'https://superflixapi.lifestyle';
+type ProviderDef = {
+  name: string;
+  movie: (id: string) => string;
+  tv: (id: string, season: number, episode: number) => string;
+};
 
-export const Streams: Record<string, StreamSource> = {};
-
-function getSuperflixPath(mediaType: MediaType) {
-  if (mediaType === 'movie') return 'filme';
-  if (mediaType === 'tv') return 'serie';
-  return null;
-}
+const PROVIDERS: ProviderDef[] = [
+  {
+    // Primary — vidsrc.to is the stable domain (vidsrc.icu has DNS issues)
+    name: 'VidSrc',
+    movie: (id) => `https://vidsrc.to/embed/movie/${id}`,
+    tv: (id, s, e) => `https://vidsrc.to/embed/tv/${id}/${s}/${e}`,
+  },
+  {
+    // Uses query-string params with tmdb=1 flag
+    name: 'MultiEmbed',
+    movie: (id) => `https://multiembed.mov/?video_id=${id}&tmdb=1`,
+    tv: (id, s, e) => `https://multiembed.mov/?video_id=${id}&tmdb=1&s=${s}&e=${e}`,
+  },
+  {
+    name: 'Embed.su',
+    movie: (id) => `https://embed.su/embed/movie/${id}`,
+    tv: (id, s, e) => `https://embed.su/embed/tv/${id}/${s}/${e}`,
+  },
+  {
+    name: 'Superflix',
+    movie: (id) => `https://superflixapi.lifestyle/filme/${id}`,
+    tv: (id, s, e) => `https://superflixapi.lifestyle/serie/${id}/${s}/${e}`,
+  },
+];
 
 function sanitizeId(id: string | number) {
   const value = String(id).trim();
@@ -29,24 +50,22 @@ function sanitizeId(id: string | number) {
   return encodeURIComponent(value);
 }
 
-export function buildSuperflixUrl(
+export function getStreams(
   mediaType: MediaType,
   id: string | number,
   options: GetStreamOptions = {}
-) {
-  const type = getSuperflixPath(mediaType);
+): StreamSource[] {
   const tmdbId = sanitizeId(id);
+  const season = Number(options.season ?? 1);
+  const episode = Number(options.episode ?? 1);
 
-  if (!type) return null;
-
-  if (mediaType === 'movie') {
-    return `${SUPERFLIX_BASE_URL}/${type}/${tmdbId}`;
-  }
-
-  const season = options.season ?? 1;
-  const episode = options.episode ?? 1;
-
-  return `${SUPERFLIX_BASE_URL}/${type}/${tmdbId}/${season}/${episode}`;
+  return PROVIDERS.map((p) => ({
+    provider: p.name,
+    type: 'iframe' as const,
+    src: mediaType === 'movie' ? p.movie(tmdbId) : p.tv(tmdbId, season, episode),
+    quality: 'auto',
+    language: 'pt-BR',
+  }));
 }
 
 export function getStream(
@@ -54,30 +73,5 @@ export function getStream(
   id: string | number,
   options: GetStreamOptions = {}
 ): StreamSource | null {
-  const season = options.season ?? 1;
-  const episode = options.episode ?? 1;
-
-  const keys = [
-    `${mediaType}:${id}:${season}:${episode}`,
-    `${mediaType}:${id}`,
-  ];
-
-  for (const key of keys) {
-    if (Streams[key]) return Streams[key];
-  }
-
-  try {
-    const src = buildSuperflixUrl(mediaType, id, options);
-    if (!src) return null;
-
-    return {
-      provider: 'Superflix',
-      type: 'iframe',
-      src,
-      quality: 'auto',
-      language: 'pt-BR',
-    };
-  } catch {
-    return null;
-  }
+  return getStreams(mediaType, id, options)[0] ?? null;
 }
